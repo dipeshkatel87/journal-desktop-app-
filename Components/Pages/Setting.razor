@@ -1,0 +1,41 @@
+﻿@page "/settings"
+@inject ThemeState Theme
+@inject NavigationManager Nav
+
+<h3>⚙️ Settings</h3>
+
+<div class="card p-3" style="max-width:520px;">
+    <h5>Theme</h5>
+    <label>
+        <input type="checkbox" @bind="DarkMode" />
+        Dark Mode
+    </label>
+
+    <button class="btn btn-primary mt-2" @onclick="SaveTheme">Save Theme</button>
+
+    <hr />
+
+    <h5>Security</h5>
+    <button class="btn btn-danger" @onclick="LockNow">Lock App</button>
+
+    <p style="color:green">@Msg</p>
+</div>
+
+@code {
+    bool DarkMode;
+    string Msg = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Theme.LoadAsync();
+        DarkMode = Theme.CurrentTheme == "dark";
+    }
+
+    async Task SaveTheme()
+    {
+        await Theme.SetAsync(DarkMode ? "dark" : "light");
+        Msg = "Theme saved ✅";
+    }
+
+    void LockNow() => Nav.NavigateTo("/");
+}

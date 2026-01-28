@@ -1,0 +1,192 @@
+﻿@page "/today"
+@using Microsoft.AspNetCore.Components
+@inject DatabaseService DB
+@inject MarkdownService MD
+
+<h3>✍️ Journal Entry</h3>
+
+<div class="row">
+    <div class="col-md-6">
+
+        <label>Entry Date</label>
+        <InputDate class="form-control" @bind-Value="EntryDate" />
+        <br />
+
+        <label>Title</label>
+        <input class="form-control" @bind="Title" />
+        <br />
+
+        <label>Primary Mood (Required)</label>
+        <select class="form-control" @bind="PrimaryMoodId">
+            <option value="0">-- select mood --</option>
+            @foreach (var m in Moods)
+            {
+                <option value="@m.Id">@m.Name (@m.Type)</option>
+            }
+        </select>
+        <br />
+
+        <label>Secondary Mood 1 (Optional)</label>
+        <select class="form-control" @bind="SecondaryMood1Id">
+            <option value="">-- none --</option>
+            @foreach (var m in Moods)
+            {
+                <option value="@m.Id">@m.Name</option>
+            }
+        </select>
+        <br />
+
+        <label>Secondary Mood 2 (Optional)</label>
+        <select class="form-control" @bind="SecondaryMood2Id">
+            <option value="">-- none --</option>
+            @foreach (var m in Moods)
+            {
+                <option value="@m.Id">@m.Name</option>
+            }
+        </select>
+        <br />
+
+        <label>Tags (comma separated)</label>
+        <input class="form-control" @bind="TagsText" placeholder="Work, Study, Health" />
+        <br />
+
+        <label>Content (Markdown)</label>
+        <textarea class="form-control" rows="10" @bind="Content"></textarea>
+        <br />
+
+        <button class="btn btn-primary" @onclick="Save">Save</button>
+        <button class="btn btn-secondary ms-2" @onclick="Load">Load</button>
+        <button class="btn btn-secondary ms-2" @onclick="NewEntry">New</button>
+        <button class="btn btn-danger ms-2" @onclick="Delete">Delete</button>
+
+        <p style="color:green">@Status</p>
+        <p style="color:red">@Error</p>
+    </div>
+
+    <div class="col-md-6">
+        <h5>✅ Live Preview</h5>
+        <div style="border:1px solid #ddd; padding:10px; min-height:320px;">
+            @((MarkupString)MD.ToHtml(Content))
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "date")]
+    public string? DateQuery { get; set; }
+
+    private DateTime EntryDate { get; set; } = DateTime.Today;
+
+    private List<MauiApp1.Models.Mood> Moods = new();
+
+    private string Title = "";
+    private string Content = "";
+    private string TagsText = "";
+
+    private int PrimaryMoodId = 0;
+    private int? SecondaryMood1Id = null;
+    private int? SecondaryMood2Id = null;
+
+    private string Status = "";
+    private string Error = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Moods = await DB.GetMoodsAsync();
+        await Load();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // If you came from Timeline like /today?date=2026-01-28
+        if (!string.IsNullOrWhiteSpace(DateQuery) && DateTime.TryParse(DateQuery, out var d))
+        {
+            EntryDate = d.Date;
+            await Load();
+        }
+    }
+
+    private async Task Load()
+    {
+        Status = ""; Error = "";
+        var entry = await DB.GetEntryByDateAsync(EntryDate.Date);
+
+        if (entry == null)
+        {
+            Status = "No entry found for this date.";
+            ClearFields();
+            return;
+        }
+
+        EntryDate = entry.EntryDate.Date;
+        Title = entry.Title;
+        Content = entry.Content;
+        PrimaryMoodId = entry.PrimaryMoodId;
+        SecondaryMood1Id = entry.SecondaryMood1Id;
+        SecondaryMood2Id = entry.SecondaryMood2Id;
+
+        // ✅ Only works if you added GetTagNamesForEntryAsync (Step 3 below)
+        var tags = await DB.GetTagNamesForEntryAsync(entry.Id);
+        TagsText = string.Join(", ", tags);
+
+        Status = "Loaded ✅";
+    }
+
+    private async Task Save()
+    {
+        Status = ""; Error = "";
+
+        if (PrimaryMoodId == 0)
+        {
+            Error = "Primary mood is required ❌";
+            return;
+        }
+
+        var tags = (TagsText ?? "")
+            .Split(',')
+            .Select(x => x.Trim())
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .ToList();
+
+        var entry = new MauiApp1.Models.JournalEntry
+        {
+            EntryDate = EntryDate.Date,
+            Title = Title ?? "",
+            Content = Content ?? "",
+            ContentType = "Markdown",
+            PrimaryMoodId = PrimaryMoodId,
+            SecondaryMood1Id = SecondaryMood1Id,
+            SecondaryMood2Id = SecondaryMood2Id
+        };
+
+        await DB.SaveOrUpdateAsync(entry, tags);
+        Status = "Saved ✅";
+    }
+
+    private async Task Delete()
+    {
+        Status = ""; Error = "";
+        await DB.DeleteAsync(EntryDate.Date);
+        ClearFields();
+        Status = "Deleted 🗑️";
+    }
+
+    private Task NewEntry()
+    {
+        Status = ""; Error = "";
+        EntryDate = DateTime.Today;
+        ClearFields();
+        Status = "New entry ready ✅";
+        return Task.CompletedTask;
+    }
+
+    private void ClearFields()
+    {
+        Title = "";
+        Content = "";
+        TagsText = "";
+        PrimaryMoodId = 0;
+        SecondaryMood1Id = null;
+        SecondaryMood2Id = null;
+    }
+}

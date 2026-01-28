@@ -1,0 +1,70 @@
+﻿@page "/export"
+@inject DatabaseService DB
+@inject PdfExportService PDF
+
+<h3>📄 Export PDF</h3>
+
+<div class="row">
+    <div class="col-md-4">
+        <label>From</label>
+        <InputDate class="form-control" @bind-Value="FromDate" />
+    </div>
+
+    <div class="col-md-4">
+        <label>To</label>
+        <InputDate class="form-control" @bind-Value="ToDate" />
+    </div>
+
+    <div class="col-md-4 d-flex align-items-end">
+        <button class="btn btn-primary w-100" @onclick="ExportPdf">Export</button>
+    </div>
+</div>
+
+<hr />
+
+@if (!string.IsNullOrWhiteSpace(Status))
+{
+    <p style="color:green">@Status</p>
+}
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <p style="color:red">@Error</p>
+}
+
+@code {
+    private DateTime FromDate { get; set; } = DateTime.Today.AddDays(-7);
+    private DateTime ToDate { get; set; } = DateTime.Today;
+
+    private string Status = "";
+    private string Error = "";
+
+    private async Task ExportPdf()
+    {
+        Status = "";
+        Error = "";
+
+        var from = FromDate.Date;
+        var to = ToDate.Date;
+
+        if (from > to)
+        {
+            Error = "From date cannot be after To date.";
+            return;
+        }
+
+        var entries = await DB.GetEntriesBetweenAsync(from, to);
+
+        if (entries.Count == 0)
+        {
+            Error = "No entries found in this date range.";
+            return;
+        }
+
+        var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+        var path = Path.Combine(desktop, $"JournalDesk_{from:yyyyMMdd}_{to:yyyyMMdd}.pdf");
+
+        PDF.Export(path, entries);
+
+        Status = $"✅ Exported {entries.Count} entries to Desktop: {path}";
+    }
+}

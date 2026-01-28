@@ -1,0 +1,87 @@
+﻿@page "/"
+@inject SecurityService Security
+@inject NavigationManager Nav
+
+<h3>🔒 JournalDesk Lock</h3>
+
+@if (loading)
+{
+    <p>Loading...</p>
+}
+else if (isFirstRun)
+{
+    <p><b>Create a PIN</b> (first time)</p>
+
+    <input class="form-control" placeholder="New PIN" @bind="pin1" type="password" />
+    <br />
+    <input class="form-control" placeholder="Confirm PIN" @bind="pin2" type="password" />
+    <br />
+    <button class="btn btn-primary" @onclick="CreatePin">Create &amp; Unlock</button>
+    <p style="color:green">@msg</p>
+    <p style="color:red">@err</p>
+}
+else
+{
+    <p><b>Enter PIN to Unlock</b></p>
+
+    <input class="form-control" placeholder="PIN" @bind="pinLogin" type="password" />
+    <br />
+    <button class="btn btn-success" @onclick="Unlock">Unlock</button>
+
+    <p style="color:green">@msg</p>
+    <p style="color:red">@err</p>
+}
+
+@code {
+    bool loading = true;
+    bool isFirstRun = false;
+
+    string pin1 = "";
+    string pin2 = "";
+    string pinLogin = "";
+
+    string msg = "";
+    string err = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        loading = true;
+        isFirstRun = !await Security.HasPinAsync();
+        loading = false;
+    }
+
+    async Task CreatePin()
+    {
+        msg = ""; err = "";
+
+        if (pin1.Length < 4)
+        {
+            err = "PIN must be at least 4 digits.";
+            return;
+        }
+        if (pin1 != pin2)
+        {
+            err = "PIN does not match.";
+            return;
+        }
+
+        await Security.SetPinAsync(pin1);
+        msg = "PIN created ✅";
+        Nav.NavigateTo("/today");
+    }
+
+    async Task Unlock()
+    {
+        msg = ""; err = "";
+
+        bool ok = await Security.VerifyPinAsync(pinLogin);
+        if (!ok)
+        {
+            err = "Wrong PIN ❌";
+            return;
+        }
+
+        msg = "Unlocked ✅";
+        Nav.NavigateTo("/today");
+    }
+}

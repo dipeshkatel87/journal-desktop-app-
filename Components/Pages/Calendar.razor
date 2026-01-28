@@ -1,0 +1,40 @@
+﻿@page "/calendar"
+@inject DatabaseService DB
+
+<h3>📅 Calendar</h3
+
+<input type="date" class="form-control" @bind="SelectedDate" />
+<br />
+<button class="btn btn-primary" @onclick="Load">Load Entry</button>
+
+<hr />
+
+@if (!string.IsNullOrWhiteSpace(Msg))
+{
+    <p style="color:red">@Msg</p> 
+}
+else if (Entry != null)
+{
+    <h5>@Entry.Title</h5>
+    <p><b>Date:</b> @Entry.EntryDate.ToString("yyyy-MM-dd")</p>
+    <pre style="white-space:pre-wrap;">@Entry.Content</pre>
+}
+
+@code {
+    private DateTime SelectedDate { get; set; } = DateTime.Today;
+
+    private MauiApp1.Models.JournalEntry? Entry;
+    private string Msg = "";
+
+    private async Task Load()
+    {
+        Msg = "";
+        Entry = null;
+
+        var selectedDate = SelectedDate.Date;
+        Entry = await DB.GetEntryByDateAsync(selectedDate);
+
+        if (Entry == null)
+            Msg = "No entry found for this date.";
+    }
+}
